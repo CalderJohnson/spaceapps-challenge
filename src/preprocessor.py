@@ -2,16 +2,26 @@
 import torch
 import config
 import pandas as pd
+import numpy as np
 
 PRELOADED_CATALOG = pd.read_csv(config.LUNAR_TRAINING_CATALOG)
 
 def load_next():
     """Generator to yield each CSV files data from the catalog."""
     for _, row in PRELOADED_CATALOG.iterrows():
-        df = pd.read_csv(f"{config.LUNAR_TRAINING_DATA}/{row['file']}")
+        df = pd.read_csv(f"{config.LUNAR_TRAINING_DATA}/{row['filename']}.csv")
 
-        time_rel = torch.tensor(df['time_rel(sec)'].values, dtype=torch.float32)
-        velocity = torch.tensor(df['velocity(m/s)'].values, dtype=torch.float32)
+        #Filter out unlikely regions
+        df_filtered = df[(df['velocity(m/s)'] < config.VELOCITY_THRESHOLD[0]) | (df['velocity(m/s)'] > config.VELOCITY_THRESHOLD[1])]
+
+        # Downsample to the model's context window
+        if len(df_filtered) > config.MAX_SEQ_LEN:
+            indices = np.linspace(0, len(df_filtered) - 1, config.MAX_SEQ_LEN, dtype=int)
+            df_filtered = df_filtered.iloc[indices]
+        
+        # Extract the time_rel and velocity columns
+        time_rel = torch.tensor(df_filtered['time_rel(sec)'].values, dtype=torch.float32)
+        velocity = torch.tensor(df_filtered['velocity(m/s)'].values, dtype=torch.float32)
         
         # Stack them into a 2D tensor (shape: [n_samples, 2])
         seismic_data = torch.stack((time_rel, velocity), dim=1)
@@ -27,4 +37,4 @@ def get_training_data():
     inputs, targets = [], []
     for seismic_data, timestamp in load_next():
         inputs.append(seismic_data), targets.append(timestamp)
-    return data
+    return torch.stack(inputs), torch.tensor(targets, dtype=torch.float32)
