@@ -15,7 +15,7 @@ model = QuakeDetector(
     config.OUTPUT_SIZE,
     config.MAX_SEQ_LEN
 )
-loss_fn = torch.nn.MSELoss()
+loss_fn = torch.nn.SmoothL1Loss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Load the training data
@@ -31,8 +31,14 @@ train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size,
 train_loader = DataLoader(train_dataset, batch_size=config.BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=config.BATCH_SIZE, shuffle=False)
 
+# Test
+for batch_idx, (inputs, targets) in enumerate(train_loader):
+    print(inputs.shape, targets.shape)
+    exit()
+
+print("Training started.")
+
 for epoch in range(config.N_EPOCHS):
-    model.train()
     running_loss = 0.0
     
     for batch_idx, (inputs, targets) in enumerate(train_loader):
@@ -54,7 +60,7 @@ for epoch in range(config.N_EPOCHS):
     
     # Print loss every epoch
     epoch_loss = running_loss / len(train_loader)
-    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}')
+    print(f'Epoch [{epoch+1}/{config.N_EPOCHS}], Loss: {epoch_loss:.4f}')
 
     # Validation every 10 epochs
     if epoch % 10 == 0:
