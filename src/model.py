@@ -20,7 +20,7 @@ class QuakeDetector(torch.nn.Module):
         
         # Output layer (final prediction)
         self.fc = nn.Linear(d_model, output_size)
-        self.bn_output = nn.BatchNorm1d(output_size)
+        self.relu = nn.ReLU()
     
     def create_positional_encoding(self, max_len, d_model):
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -40,6 +40,5 @@ class QuakeDetector(torch.nn.Module):
         x += self.positional_encoding[:, :seq_len, :]
         x = self.transformer_encoder(x)
         out = self.fc(x[:, -1, :])  # Prediction from the last time step
-        if not inference:
-            out = self.bn_output(out)
+        out = self.relu(out)  # Ensure outputs are non-negative
         return out

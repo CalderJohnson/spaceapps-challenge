@@ -24,7 +24,7 @@ OUTPUT_SIZE = 1    # Regression (relative time to quake)
 MAX_SEQ_LEN = 4096 # Maximum sequence length
 
 # Training hyperparameters
-N_EPOCHS = 10
+N_EPOCHS = 15
 BATCH_SIZE = 8
 SEQ_LEN = 4096
 SPLIT = 0.9

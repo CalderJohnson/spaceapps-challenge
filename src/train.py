@@ -1,6 +1,7 @@
 """Training loop for the model."""
 import torch
 from torch.utils.data import DataLoader, TensorDataset
+from torch.optim.lr_scheduler import StepLR
 
 import config
 import preprocessor
@@ -17,6 +18,7 @@ model = QuakeDetector(
 )
 loss_fn = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+scheduler = StepLR(optimizer, step_size=5, gamma=0.5)  # Reduce learning rate by a factor of 2 every 5 epochs
 
 # Load the training data
 inputs, targets = preprocessor.get_training_data()
@@ -52,6 +54,9 @@ for epoch in range(config.N_EPOCHS):
         
         # Track loss
         running_loss += loss.item()
+    
+    # Update the learning rate
+    scheduler.step()
     
     # Print loss every epoch
     epoch_loss = running_loss / len(train_loader)

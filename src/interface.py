@@ -20,4 +20,5 @@ def get_model_prediction(file):
     seismic_data, _ = preprocess_data(df)
     seismic_data = seismic_data.unsqueeze(0)  # Add batch dimension
     prediction = model(seismic_data, inference=True)
+    print(prediction.item())
     return prediction.item() * df['time_rel(sec)'].max()
