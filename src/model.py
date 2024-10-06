@@ -9,6 +9,7 @@ class QuakeDetector(torch.nn.Module):
         
         # Input embedding layer
         self.embedding = nn.Linear(input_size, d_model)
+        self.bn_embedding = nn.BatchNorm1d(d_model)
         
         # Positional encoding
         self.positional_encoding = self.create_positional_encoding(max_seq_len, d_model)  # max sequence length
@@ -19,6 +20,7 @@ class QuakeDetector(torch.nn.Module):
         
         # Output layer (final prediction)
         self.fc = nn.Linear(d_model, output_size)
+        self.bn_output = nn.BatchNorm1d(output_size)
     
     def create_positional_encoding(self, max_len, d_model):
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
@@ -29,10 +31,15 @@ class QuakeDetector(torch.nn.Module):
         pe = pe.unsqueeze(0)
         return pe
 
-    def forward(self, x):
+    def forward(self, x, inference=False):
         x = self.embedding(x)
-        seq_len = x.size(1)
+        batch_size, seq_len, d_model = x.size()
+        x = x.view(-1, d_model)  # Shape: [batch_size * seq_len, d_model]
+        x = self.bn_embedding(x)  # Normalizing across the feature dimension
+        x = x.view(batch_size, seq_len, d_model)  # Shape: [batch_size, seq_len, d_model]
         x += self.positional_encoding[:, :seq_len, :]
         x = self.transformer_encoder(x)
         out = self.fc(x[:, -1, :])  # Prediction from the last time step
+        if not inference:
+            out = self.bn_output(out)
         return out

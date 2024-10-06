@@ -6,6 +6,41 @@ import numpy as np
 
 PRELOADED_CATALOG = pd.read_csv(config.LUNAR_TRAINING_CATALOG)
 
+def preprocess_data(df, target=None):
+    """Preprocess the seismic data for the model."""
+
+    # Filter out unlikely regions
+    df_filtered = df[(df['velocity(m/s)'] < config.VELOCITY_THRESHOLD[0]) | (df['velocity(m/s)'] > config.VELOCITY_THRESHOLD[1])]
+
+    # Downsample to the model's context window
+    if len(df_filtered) > config.MAX_SEQ_LEN:
+        indices = np.linspace(0, len(df_filtered) - 1, config.MAX_SEQ_LEN, dtype=int)
+        df_filtered = df_filtered.iloc[indices]
+    
+    # Normalize relative time
+    df_filtered['time_rel(sec)'] = (df_filtered['time_rel(sec)'] - df_filtered['time_rel(sec)'].min()) / (df_filtered['time_rel(sec)'].max() - df_filtered['time_rel(sec)'].min())
+
+    # Min max normalize seismic velocity
+    min_velocity = df_filtered['velocity(m/s)'].min()
+    max_velocity = df_filtered['velocity(m/s)'].max()
+    df_filtered['velocity(m/s)'] = 2 * (df['velocity(m/s)'] - min_velocity) / (max_velocity - min_velocity) - 1
+
+    # Extract the time_rel and velocity columns
+    time_rel = torch.tensor(df_filtered['time_rel(sec)'].values, dtype=torch.float32)
+    velocity = torch.tensor(df_filtered['velocity(m/s)'].values, dtype=torch.float32)
+    
+    # Stack them into a 2D tensor (shape: [n_samples, 2])
+    seismic_data = torch.stack((time_rel, velocity), dim=1)
+    
+    # Extract the associated timestamp from the catalog
+    if target:
+        timestamp = target / df['time_rel(sec)'].max()
+    else:
+        timestamp = None
+
+    return seismic_data, timestamp
+
+
 def load_next():
     """Generator to yield each CSV files data from the catalog."""
     for _, row in PRELOADED_CATALOG.iterrows():
@@ -14,31 +49,7 @@ def load_next():
         except FileNotFoundError:
             continue
 
-        # Filter out unlikely regions
-        df_filtered = df[(df['velocity(m/s)'] < config.VELOCITY_THRESHOLD[0]) | (df['velocity(m/s)'] > config.VELOCITY_THRESHOLD[1])]
-
-        # Downsample to the model's context window
-        if len(df_filtered) > config.MAX_SEQ_LEN:
-            indices = np.linspace(0, len(df_filtered) - 1, config.MAX_SEQ_LEN, dtype=int)
-            df_filtered = df_filtered.iloc[indices]
-        
-        # Normalize relative time
-        df_filtered['time_rel(sec)'] = (df_filtered['time_rel(sec)'] - df_filtered['time_rel(sec)'].min()) / (df_filtered['time_rel(sec)'].max() - df_filtered['time_rel(sec)'].min())
-
-        # Min max normalize seismic velocity
-        min_velocity = df_filtered['velocity(m/s)'].min()
-        max_velocity = df_filtered['velocity(m/s)'].max()
-        df_filtered['velocity(m/s)'] = 2 * (df['velocity(m/s)'] - min_velocity) / (max_velocity - min_velocity) - 1
-
-        # Extract the time_rel and velocity columns
-        time_rel = torch.tensor(df_filtered['time_rel(sec)'].values, dtype=torch.float32)
-        velocity = torch.tensor(df_filtered['velocity(m/s)'].values, dtype=torch.float32)
-        
-        # Stack them into a 2D tensor (shape: [n_samples, 2])
-        seismic_data = torch.stack((time_rel, velocity), dim=1)
-        
-        # Extract the associated timestamp from the catalog
-        timestamp = row['time_rel(sec)'] / df['time_rel(sec)'].max()
+        seismic_data, timestamp = preprocess_data(df, row["time_rel(sec)"])
         
         # Yield the tuple (tensor, timestamp)
         yield seismic_data, timestamp
